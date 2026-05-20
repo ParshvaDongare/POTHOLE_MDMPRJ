@@ -1,0 +1,2 @@
+[phases.setup]
+nixPkgs = ["python311", "libxcb", "libX11", "libXrender", "libXext", "glib"]

@@ -1,0 +1,20 @@
+# Git Ignore File
+.model_cache/
+__pycache__/
+*.pt
+!best.pt
+*.pth
+node_modules/
+dist/
+.env
+.DS_Store
+*.pyc
+*.pyo
+venv/
+env/
+.venv/
+training_results/
+runs/
+pothole_yolo_workspace/
+images/
+annotations/
