@@ -16,5 +16,9 @@ env/
 training_results/
 runs/
 pothole_yolo_workspace/
-images/
-annotations/
+
+# Ignore all dataset files except a small sample (0-9)
+images/*
+!images/potholes[0-9].png
+annotations/*
+!annotations/potholes[0-9].xml
