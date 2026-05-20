@@ -16,3 +16,6 @@ pyyaml
 pandas
 scikit-learn
 matplotlib
+transformers
+tensorflow
+segment-anything

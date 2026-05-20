@@ -1,63 +1,50 @@
-# 🛣️ Pothole Detection & Road Damage Analysis System
+# Pothole Detection & Road Damage Analysis System
 
-A full-stack AI-powered pothole detection web application using **YOLOv8 segmentation**, **MiDaS depth estimation**, and a **React + FastAPI** interface. Upload a road image and get instant pothole detection with severity scoring, depth analysis, and road condition assessment.
+A full-stack AI-powered pothole detection web application using YOLOv8 segmentation, Depth Anything V2 depth estimation, and a React + FastAPI interface. Upload a road image and get pothole detection, severity scoring, depth analysis, and a road condition summary.
 
----
+## Features
 
-## 📸 Features
+- Real-time pothole detection via YOLOv8 segmentation
+- Depth estimation using Depth Anything V2
+- Severity scoring based on area, depth, and shape metrics
+- Road condition summary for each uploaded image
+- Polygon overlays for pothole visualization
+- FastAPI backend with a React frontend
+- Extended v3 analysis pipeline with clustering, ANN/CNN models, and generative augmentation
 
-- **Real-time pothole detection** via YOLOv8 segmentation model
-- **Depth estimation** using MiDaS (monocular depth) for 3D severity analysis
-- **Severity scoring** — Low / Medium / High per pothole based on area + depth
-- **Road condition summary** — Overall road health report
-- **Polygon overlays** drawn on the original image
-- **REST API** (FastAPI) with CORS support
-- **React frontend** with live detection results
+## Project Structure
 
----
-
-## 🗂️ Project Structure
-
-```
+```text
 DSprj3.0/
-├── backend.py                        # FastAPI server — detection API
-├── pothole_detection_pipeline.py     # Core pipeline (YOLO + MiDaS + severity)
-├── pothole_detection_pipeline_v3.py  # Extended pipeline (EfficientNet, VAE, DBSCAN)
-├── best.pt                           # Trained YOLOv8 segmentation weights
-├── yolov8s-seg.pt                    # YOLOv8s-seg base model (auto-downloaded)
-├── requirements.txt                  # Python dependencies
-├── nixpacks.toml                     # Railway/Render deployment config
-├── frontend/                         # Vite + React frontend
-│   ├── src/
-│   │   ├── App.jsx                   # Main UI component
-│   │   └── index.css                 # Styles
-│   ├── package.json
-│   └── vite.config.js
-├── images/                           # Dataset images (local only, gitignored)
-├── annotations/                      # Pascal VOC XML annotations (local only)
-└── PROJECT_DOCUMENTATION.md         # Full technical documentation
+|-- backend.py                        # FastAPI server using the v3 pipeline
+|-- pothole_detection_pipeline.py     # Compatibility shim re-exporting v3
+|-- pothole_detection_pipeline_v3.py  # Canonical latest pipeline
+|-- best.pt                           # Trained YOLOv8 segmentation weights
+|-- yolov8s-seg.pt                    # YOLOv8s-seg base model
+|-- sam_vit_b_01ec64.pth              # SAM checkpoint for XML -> segmentation conversion
+|-- requirements.txt                  # Python dependencies
+|-- nixpacks.toml                     # Deployment config
+|-- frontend/                         # Vite + React frontend
+|-- images/                           # Dataset images
+|-- annotations/                      # Pascal VOC XML annotations
+`-- PROJECT_DOCUMENTATION.md          # Extended project notes
 ```
 
----
-
-## ⚙️ Setup & Installation
+## Setup
 
 ### Prerequisites
-- Python 3.11+
+
+- Python 3.12 recommended
 - Node.js 18+
 
-### 1. Clone the repo
-```bash
-git clone https://github.com/ParshvaDongare/POTHOLE_MDMPRJ.git
-cd POTHOLE_MDMPRJ
-```
+### Install Python dependencies
 
-### 2. Install Python dependencies
 ```bash
 pip install -r requirements.txt
 ```
 
-### 3. Install & build the frontend
+### Build the frontend
+
 ```bash
 cd frontend
 npm install
@@ -65,23 +52,22 @@ npm run build
 cd ..
 ```
 
-### 4. Run the backend
+### Run the backend
+
 ```bash
 uvicorn backend:app --host 0.0.0.0 --port 8080
 ```
 
-Open **http://localhost:8080** in your browser.
+Open [http://localhost:8080](http://localhost:8080).
 
----
-
-## 🚀 API Usage
+## API
 
 ### `POST /detect`
-Upload an image for pothole detection.
 
-**Request:** `multipart/form-data` with field `image`
+Send a `multipart/form-data` request with the `image` field.
 
-**Response:**
+Example response:
+
 ```json
 {
   "road_condition": "Poor",
@@ -100,55 +86,29 @@ Upload an image for pothole detection.
       "confidence": 0.91,
       "normalized_depth": 0.65,
       "raw_depth": 142.3,
-      "polygon": [{"x": 120, "y": 340}, ...]
+      "polygon": [{"x": 120, "y": 340}]
     }
   ]
 }
 ```
 
----
-
-## 🧠 Model Architecture
+## Model Stack
 
 | Component | Model | Purpose |
 |---|---|---|
-| Detection | YOLOv8s-seg (`best.pt`) | Pothole localization + segmentation |
-| Depth | MiDaS DPT-Large | Monocular depth map estimation |
-| Severity | Rule-based scoring | Area ratio + depth → severity label |
-| Extended (v3) | EfficientNetV2-S + DBSCAN + VAE | Feature extraction, clustering, synthetic augmentation |
+| Detection | YOLOv8s-seg (`best.pt`) | Pothole localization and segmentation |
+| Depth | Depth Anything V2 Small | Monocular depth estimation |
+| Severity | Rule-based scoring | Area + depth + shape severity labeling |
+| Extended analysis | SVM, RF, K-Means, DBSCAN, MLP, EfficientNetV2-S, VAE | Research and downstream analysis |
 
----
+## Notes
 
-## 🌐 Deployment
+- `backend.py` now uses `pothole_detection_pipeline_v3.py` as the active pipeline.
+- `pothole_detection_pipeline.py` is kept as a compatibility alias for older imports.
+- The SAM checkpoint is only needed for XML-to-YOLO segmentation label generation and training workflows.
+- The v3 pipeline expects Python 3.12 because TensorFlow support is limited on newer versions.
 
-This project is configured for **Railway** deployment via `nixpacks.toml`.
+## Author
 
-> ⚠️ **Note:** `sam_vit_b_01ec64.pth` (SAM model, 375MB) and the dataset (`images/`, `annotations/`) are excluded from the repo. The SAM model is downloaded automatically at runtime when using the v3 pipeline.
-
-### Deploy to Railway
-1. Connect the GitHub repo to Railway
-2. Set start command: `uvicorn backend:app --host 0.0.0.0 --port $PORT`
-3. Railway auto-detects nixpacks config
-
----
-
-## 📊 Dataset
-
-- **665 road images** with Pascal VOC XML annotations
-- Pothole bounding boxes + segmentation masks
-- Images sourced from real-world road surveys
-
----
-
-## 🛠️ Tech Stack
-
-**Backend:** Python · FastAPI · PyTorch · Ultralytics YOLOv8 · OpenCV · MiDaS  
-**Frontend:** React · Vite · JavaScript  
-**Deployment:** Railway (nixpacks) · Uvicorn
-
----
-
-## 👤 Author
-
-**Parshva Dongare**  
+Parshva Dongare  
 [GitHub](https://github.com/ParshvaDongare)

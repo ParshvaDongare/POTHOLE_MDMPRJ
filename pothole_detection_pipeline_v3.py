@@ -102,10 +102,11 @@ random.seed(RANDOM_SEED)
 np.random.seed(RANDOM_SEED)
 torch.manual_seed(RANDOM_SEED)
 
-DEFAULT_CONFIDENCE_THRESHOLD = 0.40        # Lowered for multi-scale merge
-MASK_IOU_DUPLICATE_THRESHOLD = 0.50
+DEFAULT_CONFIDENCE_THRESHOLD = 0.42        # Sync with live backend threshold
+MASK_IOU_DUPLICATE_THRESHOLD = 0.30       # Merge masks with 30%+ overlap (was 0.50)
 MAX_POLYGON_POINTS = 64                    # Higher fidelity polygons
 CONVERSION_PROGRESS_INTERVAL = 25
+LIVE_LOW_SEVERITY_MIN_AREA_RATIO = 0.003   # Hide only the smallest low-risk fragments in portal output
 
 SAM_CHECKPOINT = PROJECT_ROOT / "sam_vit_b_01ec64.pth"
 SAM_MODEL_TYPE = "vit_b"
@@ -851,7 +852,34 @@ def remove_duplicate_detections(pothole_data):
     return filtered
 
 
-def extract_pothole_features(detection_result, image_bgr):
+def renumber_potholes(pothole_data):
+    for index, pothole in enumerate(pothole_data, start=1):
+        pothole["id"] = index
+    return pothole_data
+
+
+def filter_live_detections(
+    pothole_data,
+    low_severity_min_area_ratio=LIVE_LOW_SEVERITY_MIN_AREA_RATIO,
+):
+    """Reduce portal clutter by hiding only very small low-severity fragments."""
+    if not pothole_data:
+        return pothole_data
+
+    filtered = []
+    for pothole in pothole_data:
+        severity = pothole.get("severity", "Low")
+        area_ratio = float(pothole.get("area_ratio", 0.0))
+        if severity == "Low" and area_ratio < low_severity_min_area_ratio:
+            continue
+        filtered.append(pothole)
+
+    if filtered:
+        return renumber_potholes(filtered)
+    return renumber_potholes(pothole_data)
+
+
+def extract_pothole_features(detection_result, image_bgr, min_conf=None):
     """
     Extract bbox, mask, area, confidence, and shape metrics for each pothole.
 
@@ -867,6 +895,7 @@ def extract_pothole_features(detection_result, image_bgr):
     ih, iw = image_bgr.shape[:2]
     image_area = float(iw * ih)
     pothole_data = []
+    confidence_threshold = min_conf if min_conf is not None else DEFAULT_CONFIDENCE_THRESHOLD
 
     if boxes is None or len(boxes) == 0:
         return pothole_data
@@ -874,7 +903,7 @@ def extract_pothole_features(detection_result, image_bgr):
     for idx, box in enumerate(boxes):
         xyxy = box.xyxy[0].cpu().numpy()
         confidence = float(box.conf[0].cpu().numpy())
-        if confidence < DEFAULT_CONFIDENCE_THRESHOLD:
+        if confidence < confidence_threshold:
             continue
 
         x1, y1, x2, y2 = xyxy
@@ -1091,9 +1120,9 @@ def assign_severity_labels(pothole_data, image_width=None, image_height=None):
         # Irregular, rough shapes are more hazardous
         shape_danger = min(1.0, 0.5 * convexity_deficit + 0.5 * max(0, roughness - 1.0))
 
-        # v2: 50% area + 30% depth + 20% shape
-        severity_score = (0.50 * normalized_area +
-                          0.30 * normalized_depth +
+        # v2: 55% area + 25% depth + 20% shape
+        severity_score = (0.55 * normalized_area +
+                          0.25 * normalized_depth +
                           0.20 * shape_danger)
 
         p["area_ratio"] = area_ratio
@@ -1102,8 +1131,8 @@ def assign_severity_labels(pothole_data, image_width=None, image_height=None):
         p["severity_score"] = severity_score
         p["shape_danger"] = shape_danger
         p["severity"] = (
-            "Low" if severity_score < 0.35
-            else "Medium" if severity_score < 0.60
+            "Low" if severity_score < 0.28
+            else "Medium" if severity_score < 0.50
             else "High"
         )
 
